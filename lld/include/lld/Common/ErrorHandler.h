@@ -154,6 +154,8 @@ uint64_t errorCount();
 
 enum class DiagLevel { Log, Warn, Err, Fatal };
 
+// A class that synchronizes thread writing to the same stream similar
+// std::osyncstream.
 class SyncStream {
   ErrorHandler &e;
   DiagLevel level;

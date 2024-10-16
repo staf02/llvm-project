@@ -108,7 +108,7 @@ void Ctx::reset() {
   script = nullptr;
   target.reset();
 
-  e = nullptr;
+  errHandler = nullptr;
 
   bufferStart = nullptr;
   mainPart = nullptr;
@@ -178,7 +178,7 @@ bool link(ArrayRef<const char *> args, llvm::raw_ostream &stdoutOS,
   Ctx &ctx = elf::ctx;
   LinkerScript script(ctx);
   ctx.script = &script;
-  ctx.e = &context->e;
+  ctx.errHandler = &context->e;
   ctx.symAux.emplace_back();
   ctx.symtab = std::make_unique<SymbolTable>(ctx);
 
