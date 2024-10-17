@@ -48,7 +48,7 @@ std::string lld::toString(RelType type) {
 const ELFSyncStream &elf::operator<<(const ELFSyncStream &s, RelType type) {
   StringRef buf = getELFRelocationTypeName(s.ctx.arg.emachine, type);
   if (buf == "Unknown")
-    s << ("Unknown (" + Twine(type) + ")").str();
+    s << "Unknown (" << Twine(type) << ")";
   else
     s << buf;
   return s;

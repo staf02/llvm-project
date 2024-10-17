@@ -1703,7 +1703,7 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
     parallel::strategy = hardware_concurrency(threads);
     ctx.arg.thinLTOJobs = v;
   } else if (parallel::strategy.compute_thread_count() > 16) {
-    log("set maximum concurrency to 16, specify --threads= to change");
+    Log(ctx) << "set maximum concurrency to 16, specify --threads= to change";
     parallel::strategy = hardware_concurrency(16);
   }
   if (auto *arg = args.getLastArg(OPT_thinlto_jobs_eq))
@@ -2481,7 +2481,7 @@ static void readSymbolPartitionSection(Ctx &ctx, InputSectionBase *s) {
   StringRef partName = reinterpret_cast<const char *>(s->content().data());
   for (Partition &part : ctx.partitions) {
     if (part.name == partName) {
-      sym->partition = part.getNumber();
+      sym->partition = part.getNumber(ctx);
       return;
     }
   }
@@ -2505,12 +2505,12 @@ static void readSymbolPartitionSection(Ctx &ctx, InputSectionBase *s) {
   // sizes of the Partition fields in InputSectionBase and Symbol, as well as
   // the amount of space devoted to the partition number in RankFlags.
   if (ctx.partitions.size() == 254)
-    fatal("may not have more than 254 partitions");
+    Fatal(ctx) << "may not have more than 254 partitions";
 
   ctx.partitions.emplace_back(ctx);
   Partition &newPart = ctx.partitions.back();
   newPart.name = partName;
-  sym->partition = newPart.getNumber();
+  sym->partition = newPart.getNumber(ctx);
 }
 
 static void markBuffersAsDontNeed(Ctx &ctx, bool skipLinkedOutput) {
