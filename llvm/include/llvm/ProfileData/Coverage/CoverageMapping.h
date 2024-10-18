@@ -34,6 +34,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -213,6 +214,11 @@ public:
   /// Return a counter that represents the expression that subtracts RHS from
   /// LHS.
   Counter subtract(Counter LHS, Counter RHS, bool Simplify = true);
+
+  using ReplaceMap = std::map<Counter, Counter>;
+
+  /// Return a counter for each term in the expression replaced by ReplaceMap.
+  Counter replace(Counter C, const ReplaceMap &Map);
 };
 
 using LineColPair = std::pair<unsigned, unsigned>;
@@ -358,20 +364,21 @@ struct CounterMappingRegion {
 struct CountedRegion : public CounterMappingRegion {
   uint64_t ExecutionCount;
   uint64_t FalseExecutionCount;
-  bool Folded;
+  bool TrueFolded;
+  bool FalseFolded;
   bool HasSingleByteCoverage;
 
   CountedRegion(const CounterMappingRegion &R, uint64_t ExecutionCount,
                 bool HasSingleByteCoverage)
       : CounterMappingRegion(R), ExecutionCount(ExecutionCount),
-        FalseExecutionCount(0), Folded(false),
+        FalseExecutionCount(0), TrueFolded(false), FalseFolded(true),
         HasSingleByteCoverage(HasSingleByteCoverage) {}
 
   CountedRegion(const CounterMappingRegion &R, uint64_t ExecutionCount,
                 uint64_t FalseExecutionCount, bool HasSingleByteCoverage)
       : CounterMappingRegion(R), ExecutionCount(ExecutionCount),
-        FalseExecutionCount(FalseExecutionCount), Folded(false),
-        HasSingleByteCoverage(HasSingleByteCoverage) {}
+        FalseExecutionCount(FalseExecutionCount), TrueFolded(false),
+        FalseFolded(false), HasSingleByteCoverage(HasSingleByteCoverage) {}
 };
 
 /// MCDC Record grouping all information together.
@@ -719,10 +726,10 @@ struct FunctionRecord {
         Region.Kind == CounterMappingRegion::MCDCBranchRegion) {
       CountedBranchRegions.emplace_back(Region, Count, FalseCount,
                                         HasSingleByteCoverage);
-      // If both counters are hard-coded to zero, then this region represents a
+      // If either counters is hard-coded to zero, then this region represents a
       // constant-folded branch.
-      if (Region.Count.isZero() && Region.FalseCount.isZero())
-        CountedBranchRegions.back().Folded = true;
+      CountedBranchRegions.back().TrueFolded = Region.Count.isZero();
+      CountedBranchRegions.back().FalseFolded = Region.FalseCount.isZero();
       return;
     }
     if (CountedRegions.empty())
