@@ -72,20 +72,13 @@ public:
   stable_hash hashAPInt(const APInt &I) {
     SmallVector<stable_hash> Hashes;
     Hashes.emplace_back(I.getBitWidth());
-    for (unsigned J = 0; J < I.getNumWords(); ++J)
-      Hashes.emplace_back((I.getRawData())[J]);
+    auto RawVals = ArrayRef<uint64_t>(I.getRawData(), I.getNumWords());
+    Hashes.append(RawVals.begin(), RawVals.end());
     return stable_hash_combine(Hashes);
   }
 
   stable_hash hashAPFloat(const APFloat &F) {
-    SmallVector<stable_hash> Hashes;
-    const fltSemantics &S = F.getSemantics();
-    Hashes.emplace_back(APFloat::semanticsPrecision(S));
-    Hashes.emplace_back(APFloat::semanticsMaxExponent(S));
-    Hashes.emplace_back(APFloat::semanticsMinExponent(S));
-    Hashes.emplace_back(APFloat::semanticsSizeInBits(S));
-    Hashes.emplace_back(hashAPInt(F.bitcastToAPInt()));
-    return stable_hash_combine(Hashes);
+    return hashAPInt(F.bitcastToAPInt());
   }
 
   stable_hash hashGlobalValue(const GlobalValue *GV) {
@@ -109,8 +102,7 @@ public:
       return stable_hash_combine(Hashes);
     }
 
-    auto *G = dyn_cast<GlobalValue>(C);
-    if (G) {
+    if (auto *G = dyn_cast<GlobalValue>(C)) {
       Hashes.emplace_back(hashGlobalValue(G));
       return stable_hash_combine(Hashes);
     }
@@ -138,8 +130,6 @@ public:
     }
     case Value::ConstantArrayVal: {
       const ConstantArray *A = cast<ConstantArray>(C);
-      uint64_t NumElements = cast<ArrayType>(Ty)->getNumElements();
-      Hashes.emplace_back(NumElements);
       for (auto &Op : A->operands()) {
         auto H = hashConstant(cast<Constant>(Op));
         Hashes.emplace_back(H);
@@ -148,8 +138,6 @@ public:
     }
     case Value::ConstantStructVal: {
       const ConstantStruct *S = cast<ConstantStruct>(C);
-      unsigned NumElements = cast<StructType>(Ty)->getNumElements();
-      Hashes.emplace_back(NumElements);
       for (auto &Op : S->operands()) {
         auto H = hashConstant(cast<Constant>(Op));
         Hashes.emplace_back(H);
@@ -158,8 +146,6 @@ public:
     }
     case Value::ConstantVectorVal: {
       const ConstantVector *V = cast<ConstantVector>(C);
-      unsigned NumElements = cast<FixedVectorType>(Ty)->getNumElements();
-      Hashes.emplace_back(NumElements);
       for (auto &Op : V->operands()) {
         auto H = hashConstant(cast<Constant>(Op));
         Hashes.emplace_back(H);
@@ -168,8 +154,6 @@ public:
     }
     case Value::ConstantExprVal: {
       const ConstantExpr *E = cast<ConstantExpr>(C);
-      unsigned NumOperands = E->getNumOperands();
-      Hashes.emplace_back(NumOperands);
       for (auto &Op : E->operands()) {
         auto H = hashConstant(cast<Constant>(Op));
         Hashes.emplace_back(H);
@@ -188,10 +172,10 @@ public:
       Hashes.emplace_back(H);
       return stable_hash_combine(Hashes);
     }
-    default: // Unknown constant, abort.
-      llvm_unreachable("Constant ValueID not recognized.");
+    default:
+      // Skip other types of constants for simplicity.
+      return stable_hash_combine(Hashes);
     }
-    return Hash;
   }
 
   stable_hash hashValue(Value *V) {
@@ -206,8 +190,8 @@ public:
       Hashes.emplace_back(Arg->getArgNo());
 
     // Get an index (an insertion order) for the non-constant value.
-    auto I = ValueToId.insert({V, ValueToId.size()});
-    Hashes.emplace_back(I.first->second);
+    auto [It, WasInserted] = ValueToId.try_emplace(V, ValueToId.size());
+    Hashes.emplace_back(It->second);
 
     return stable_hash_combine(Hashes);
   }
@@ -236,14 +220,14 @@ public:
     unsigned InstIdx = 0;
     if (IndexInstruction) {
       InstIdx = IndexInstruction->size();
-      IndexInstruction->insert({InstIdx, const_cast<Instruction *>(&Inst)});
+      IndexInstruction->try_emplace(InstIdx, const_cast<Instruction *>(&Inst));
     }
 
     for (const auto [OpndIdx, Op] : enumerate(Inst.operands())) {
       auto OpndHash = hashOperand(Op);
       if (IgnoreOp && IgnoreOp(&Inst, OpndIdx)) {
         assert(IndexOperandHashMap);
-        IndexOperandHashMap->insert({{InstIdx, OpndIdx}, OpndHash});
+        IndexOperandHashMap->try_emplace({InstIdx, OpndIdx}, OpndHash);
       } else
         Hashes.emplace_back(OpndHash);
     }
