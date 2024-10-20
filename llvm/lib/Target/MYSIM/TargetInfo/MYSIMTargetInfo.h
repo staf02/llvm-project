@@ -1,0 +1,9 @@
+#ifndef LLVM_LIB_TARGET_MYSIM_TARGETINFO_MYSIMTARGETINFO_H
+#define LLVM_LIB_TARGET_MYSIM_TARGETINFO_MYSIMTARGETINFO_H
+
+namespace llvm {
+class Target;
+Target &getTheMYSIMTarget();
+} // end namespace llvm
+
+#endif // LLVM_LIB_TARGET_MYSIM_TARGETINFO_MYSIMTARGETINFO_H
